@@ -1,0 +1,325 @@
+import pygame
+from pygame.locals import *
+
+pygame.init()
+
+
+clock = pygame.time.Clock()
+fps = 60
+#taille écran
+screen_width = 1920
+screen_height = 1080
+
+screen = pygame.display.set_mode((screen_width, screen_height))
+pygame.display.set_caption('MysticMaze')
+
+#load images
+Bg_img =  pygame.image.load('BACKGROUND GAME/plx-3.png')
+restart_img = pygame.image.load ('BACKGROUND GAME/TILES/Bouton jouer.png')
+
+
+#définir variables jeu
+tile_size = 128
+
+game_over = 0
+
+"""#grille séparation tiles
+def draw_grid():
+	for line in range(0, 20):
+		pygame.draw.line(screen, (255, 255, 255), (0, line * tile_size), (screen_width, line * tile_size))
+		pygame.draw.line(screen, (255, 255, 255), (line * tile_size, 0), (line * tile_size, screen_height))"""
+
+
+
+
+class Button():
+	def __init__(self, x, y, image):
+		self.image = image
+		self.rect = self.image.get_rect()
+		self.rect.x = x
+		self.rect.y = y
+		self.clicked = False
+
+	def draw(self):
+		action = False
+
+		#get mouse position
+		pos = pygame.mouse.get_pos()
+
+		#check mouseover and clicked conditions
+		if self.rect.collidepoint(pos):
+			if pygame.mouse.get_pressed()[0] == 1 and self.clicked == False:
+				action = True
+				self.clicked = True
+
+		if pygame.mouse.get_pressed()[0] == 0:
+			self.clicked = False
+
+
+		#draw button
+		screen.blit(self.image, self.rect)
+
+		return action
+
+#Lives
+playerLives = 3
+playerLivesImg = pygame.image.load(f'PROPS/Coeur_0001.png')
+
+
+class Player():
+	def __init__(self, x, y):
+		self.images_right = []
+		self.images_left = []
+		self.images_right_jump = []
+		self.images_left_jump = []
+		self.index = 0
+		self.counter = 0
+		for num in range(1,4):
+			img_right = pygame.image.load(f'BACKGROUND GAME/MYSTIC/Mystic_walk_right {num}.png')
+			img_right = pygame.transform.scale(img_right, (120, 120))
+			img_left =pygame.transform.flip(img_right, True, False)
+			self.images_right.append(img_right)
+			self.images_left.append(img_left)
+			self.image = self.images_right[self.index]
+		for num in range(1,3):
+			img_right_jump = pygame.image.load(f'BACKGROUND GAME/MYSTIC/Mystic_jump_right {num}.png')
+			img_right_jump = pygame.transform.scale(img_right_jump, (120, 120))
+			img_left_jump =pygame.transform.flip(img_right_jump, True, False)
+			self.images_right_jump.append(img_right_jump)
+			self.images_left_jump.append(img_left_jump)
+			self.image = self.images_right_jump[self.index]
+		self.dead_image = pygame.image.load('BACKGROUND GAME/MYSTIC/dead_kitty.png')
+		self.rect = self.image.get_rect()
+		self.rect.x = x
+		self.rect.y = y
+		self.width = self.image.get_width()
+		self.height = self.image.get_height()
+		self.vel_y = 0
+		self.jumped = False
+		self.direction = 0
+		self.ant_key_pressed = ''
+
+
+	def update(self, game_over):
+		dx = 0
+		dy = 0
+		walk_cooldown = 4
+
+		if game_over == 0:
+			#mouvement joueur
+			key = pygame.key.get_pressed()
+			if key[pygame.K_SPACE] and self.jumped == False:
+				self.vel_y = -15
+				self.jumped = True
+			if key[pygame.K_SPACE] == False:
+				self.jumped = False
+			if key[pygame.K_LEFT]:
+				dx -= 15
+				self.counter += 1
+				if self.ant_key_pressed != 'L':
+					self.counter += walk_cooldown
+				self.direction = -1
+				self.ant_key_pressed = 'L'
+			if key[pygame.K_RIGHT]:
+				dx += 15
+				self.counter += 1
+				if self.ant_key_pressed != 'R':
+					self.counter += walk_cooldown
+				self.direction = 1
+				self.ant_key_pressed = 'R'
+			if key[pygame.K_LEFT] == False and key[pygame.K_RIGHT] ==False:
+				self.counter = 0
+				self.index = 0
+				self.ant_key_pressed = ''
+				if self.direction == 1:
+					self.image = self.images_right[self.index]
+				if self.direction == -1:
+					self.image = self.images_left[self.index]
+
+			#animations
+			if self.counter > walk_cooldown:
+				self.counter = 0
+				self.index += 1
+				if self.index >= len(self.images_right):
+					self.index = 0
+				if self.direction == 1:
+					self.image = self.images_right[self.index]
+				if self.direction == -1:
+					self.image = self.images_left[self.index]
+
+
+			#gravité
+			self.vel_y += 1
+			if self.vel_y > 9:
+				self.vel_y = 13
+			dy += self.vel_y
+
+		#check for collision
+			for tile in world.tile_list:
+				#check for collision in x direction
+				if tile[1].colliderect(self.rect.x + dx, self.rect.y, self.width, self.height):
+					dx = 0
+				#check for collision in y direction
+				if tile[1].colliderect(self.rect.x, self.rect.y + dy, self.width, self.height):
+					#check if below the ground i.e. jumping
+					if self.vel_y < 0:
+						dy = tile[1].bottom - self.rect.top
+						self.vel_y = 0
+					#check if above the ground i.e. falling
+					elif self.vel_y >= 0:
+						dy = tile[1].top - self.rect.bottom
+						self.vel_y = 0
+			#check collision ghost
+			if pygame.sprite.spritecollide(self, ghost_group, False):
+				game_over = -1
+			#check collision vide
+			if pygame.sprite.spritecollide(self, ghost_group, False):
+				game_over = -1
+
+
+			#update player coordinates
+			self.rect.x += dx
+			self.rect.y += dy
+
+		elif  game_over == -1: 
+			self.image = self.dead_image
+			if self.rect.y > 250:
+				self.rect.y -= 10
+
+		#dessiner joueur
+		screen.blit(self.image, self.rect)
+		""""pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)"""
+
+		return game_over
+
+
+class World():
+	def __init__(self, data):
+		self.tile_list = []
+
+		#load images
+		dirt_img = pygame.image.load('BACKGROUND GAME/TILES/tiles_0010.png')
+		grass_img = pygame.image.load('BACKGROUND GAME/TILES/tiles_0005.png')
+
+		row_count = 0
+		for row in data:
+			col_count = 0
+			for tile in row:
+				if tile == 1:
+					img = pygame.transform.scale(grass_img, (tile_size, tile_size))
+					img_rect = img.get_rect()
+					img_rect.x = col_count * tile_size
+					img_rect.y = row_count * tile_size
+					tile = (img, img_rect)
+					self.tile_list.append(tile)
+				if tile == 2:
+					img = pygame.transform.scale(dirt_img, (tile_size, tile_size))
+					img_rect = img.get_rect()
+					img_rect.x = col_count * tile_size
+					img_rect.y = row_count * tile_size
+					tile = (img, img_rect)
+					self.tile_list.append(tile)
+				if tile == 3:
+					ghost = Enemy(col_count * tile_size, row_count * tile_size)
+					ghost_group.add(ghost)
+				if tile == 4:
+					vide = Vide(col_count * tile_size, row_count * tile_size + (tile_size // 2))
+					vide_group.add(vide)
+
+				col_count += 1
+			row_count += 1
+
+
+	def draw(self):
+		for tile in self.tile_list:
+			screen.blit(tile[0], tile[1])                
+        
+#class ennemis
+			  
+class Enemy(pygame.sprite.Sprite):
+	def __init__(self, x, y):
+		pygame.sprite.Sprite.__init__(self)
+		self.image = pygame.image.load('GHOST/ghost droite_0001.png')
+		self.rect = self.image.get_rect()
+		self.rect.x = x
+		self.rect.y = y
+		self.move_direction = 3
+		self.move_counter = 0
+
+	def update(self):
+		self.rect.x += self.move_direction
+		self.move_counter += 1
+		if abs(self.move_counter) > 50:
+			self.move_direction *= -1
+			self.move_counter *= -1
+			self.image = pygame.transform.flip(self.image, True, False)
+
+#class vide
+
+class Vide(pygame.sprite.Sprite):
+	def __init__(self, x, y):
+		pygame.sprite.Sprite.__init__(self)
+		img = pygame.image.load('BACKGROUND GAME/TILES/Vide.png')
+		self.image = pygame.transform.scale(img, (tile_size, tile_size // 2))
+		self.rect = self.image.get_rect()
+		self.rect.x = x
+		self.rect.y = y
+
+
+#info tiles
+            
+world_data = [
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0],
+[1, 1, 1, 1, 1, 1, 4, 4, 1, 1, 1, 1, 1, 1, 1],
+[2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+]
+
+player = Player(100, screen_height - 128)
+
+ghost_group = pygame.sprite.Group()
+vide_group = pygame.sprite.Group()
+
+world = World(world_data)
+
+#créer boutons
+restart_button = Button(screen_height //2, screen_width // 2, restart_img)
+
+#game loop
+run = True
+while run == True:
+
+	clock.tick(fps)
+	screen.blit(Bg_img, (0,0))
+
+	world.draw()
+
+	if game_over == 0:
+		ghost_group.update()
+	
+	ghost_group.draw(screen)
+	vide_group.draw(screen)
+
+	game_over = player.update(game_over)
+
+
+	#si le joueur meurt
+	if game_over == -1:
+		restart_button.draw()
+
+	"""draw_grid()"""
+
+	#print(world.tile_list)
+
+	for event in pygame.event.get():
+		if event.type == pygame.QUIT:
+			run = False
+
+	pygame.display.update()
+
+pygame.quit()
